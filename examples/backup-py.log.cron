@@ -1,0 +1,15 @@
+#!/bin/sh
+
+prg=/usr/sbin/backup.py
+logfile=/var/log/backup.log
+backups=/var/backups
+
+if cd $backups ; then
+   if ! cmp -s backup.log.0 $logfile ; then
+      cp -p $logfile backup.log
+      savelog -c 7 backup.log >/dev/null
+   fi
+fi
+
+
+

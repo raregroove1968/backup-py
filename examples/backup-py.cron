@@ -1,0 +1,3 @@
+# System Backup
+#  example: daily(04:10AM) cronjob and logging to a file
+10 04 * * * root /usr/sbin/backup.py > /var/log/backup.log 2>&1
