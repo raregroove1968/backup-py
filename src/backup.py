@@ -12,6 +12,7 @@ import os
 import sys
 from time import mktime, strftime
 from datetime import date, datetime
+import re
 
 def check_repo_server(cfg):
     try:
@@ -24,6 +25,7 @@ def check_repo_server(cfg):
             details['bk_home'] + '/' + details['bk_repository'],
             details['bk_home'] + '/' + details['bk_dir'], 
             details['bk_home'] + '/' + details['bk_dbdir'], 
+            details['bk_home'] + '/' + details['bk_mirror'], 
             details['bk_archive'],
             remote_archive,
         ]
@@ -76,6 +78,25 @@ def set_target_dirs(cfg):
             targets.append(d)
     except configparser.Error as e:
         print ("Error: can't parse config at set_target_dirs():", e)
+        sys.exit(1)
+    else:
+        return targets
+
+def set_target_mirrors(cfg):
+    try:
+        targets = {}
+        basics = cfg['basic']
+        args = ['scheme','host','path']
+        for d in basics['target_mirrors'].splitlines():
+            targets[d] = {}
+            m = re.match(r"(?P<scheme>[^:]+)://(?P<host>[^/]+)(?P<path>/.*$)",d)
+            if m is None:
+                print ("Not Matched")
+                sys.exit(1)
+            for a in args:
+                targets[d][a] = m.group(a)
+    except configparser.Error as e:
+        print ("Error: can't parse config at set_target_mirrors():", e)
         sys.exit(1)
     else:
         return targets
@@ -141,6 +162,34 @@ def dirs_backup_exe(cfg,targets):
             print ("done\n")
     return
 
+def mirrors_backup_exe(cfg,targets):
+    details = cfg['detail']
+    for d in targets:
+        try:
+            print ("backup %s ..." % d)
+            synctype = targets[d]['scheme']
+            syncargs = {}
+            syncargs['verbose'] = cfg[synctype]['verbose'] if not details.getboolean('is_quiet') else ''
+            syncargs['host'] = targets[d]['host']
+            syncargs['src'] = targets[d]['path']
+            syncargs['dest'] = details['bk_home'] + '/' + details['bk_mirror']
+            cmd = cfg.get(synctype,'cmd_format',raw=True) % syncargs
+            output_cmd = ""
+            if details.getboolean('is_test'):
+                print ("EXEC: ",cmd)
+            else:
+                output_cmd = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as c:
+            print ("Execute Failed:", c)
+            sys.exit(c.returncode)
+        else:
+            if not details.getboolean('is_quiet') and not details.getboolean('is_test'):
+                print (output_cmd.decode('utf-8'))
+                lap = mktime(datetime.now().timetuple())
+                print ("Lap Time:", lap - begin_date)
+            print ("done\n")
+    return
+
 def make_archive(cfg,today):
     basics = cfg['basic']
     details = cfg['detail']
@@ -150,7 +199,7 @@ def make_archive(cfg,today):
         archiveargs = {}
         archiveargs['exec_dir'] = details['bk_home'] + '/' + details['bk_repository']
         archiveargs['archive_file'] = '%s/BACKUP_%s_%s.tgz' % (details['bk_archive'],basics['host'],today)
-        archiveargs['target_dir'] = '*'
+        archiveargs['target_dir'] = details['archive_target']
         archivecmd = cfg.get(archivetype,'cmd_format',raw=True) % archiveargs
         cptype = details['cp_type']
         cpargs = {}
@@ -294,6 +343,7 @@ if results.is_test:
 if results.create_dir:
     config.set('detail','create_dir','1')
 
+
 #
 # check and create directories for repository and archive server
 #
@@ -320,6 +370,15 @@ if config.has_option('basic','target_dbs'):
 if config.has_option('basic','target_dirs'):
     target_dirs = set_target_dirs(config)
     dirs_backup_exe(config,target_dirs)
+
+
+#
+# file and directory backup WITHOUT archive (only mirror)
+#
+if config.has_option('basic','target_mirrors'):
+    mirrors = set_target_mirrors(config)
+    mirrors_backup_exe(config,mirrors)
+
 
 #
 # make an archive file from repository and copy to archive server
