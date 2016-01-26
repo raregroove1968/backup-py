@@ -5,6 +5,8 @@
 # Copyright 2016 Yasutaka SATO <yasutaka@freesoul.org>
 #
 
+__version__ = '1.2.0'
+
 import configparser
 import subprocess
 import argparse
@@ -36,10 +38,9 @@ def check_repo_server(cfg):
                     os.makedirs(d)
                 else:
                     errors.append(d)
-            if len(errors) > 0:
-                #print 'Error: ' + ', '.join(errors) + " don't exist"
-                print ('Error: ',', '.join(errors) ," don't exist")
-                sys.exit(1)
+        if len(errors) > 0:
+            print ('Error: ',', '.join(errors) ," don't exist")
+            sys.exit(1)
     except configparser.Error as e:
         print ("Error: can't parse config at check_repo_server():", e)
         sys.exit(1)
@@ -320,21 +321,23 @@ parser.add_argument('-t', action='store_true', dest='is_test', default=False,
                     help='test run with no changes made')
 parser.add_argument('-m', action='store_true', dest='create_dir', default=False,
                     help='create the repository')
+parser.add_argument('-V', '--version', action='version', version='%(prog)s '+ __version__,
+                    help='version information')
 
 results = parser.parse_args()
 
 #
 # load config and set vars
 #
-if os.path.isfile(results.file):
+if os.access(results.file,os.R_OK):
     try:
         config = configparser.ConfigParser(allow_no_value=True)
         config.read(results.file)
-    except configparser.Error as e:
-        print ("Error: %s can't read:" % results.file)
+    except config.ParsingError as e:
+        print ("Error: %s can't read" % results.file)
         sys.exit(e.returncode)
 else:
-    print ("Error: %s not found" % results.file)
+    print ("Error: %s not found OR can't read" % results.file)
     sys.exit(1)
 
 if results.is_test:
@@ -355,7 +358,9 @@ check_repo_server(config)
 #
 date = strftime("%Y%m%d")
 begin_date = mktime(datetime.now().timetuple())
-print ("BEGIN Backup\n")
+#print ("BEGIN Backup\n")
+#print ("BEGIN Backup\n\tProgram Version: %s\n\tStart Date: %s\n" % __version__, begin_date)
+print ("BEGIN Backup  by %s %s\n" % (sys.argv[0], __version__))
 
 #
 # database backup
