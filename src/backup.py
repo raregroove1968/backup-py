@@ -5,7 +5,7 @@
 # Copyright 2016 Yasutaka SATO <yasutaka@freesoul.org>
 #
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 
 import configparser
 import subprocess
