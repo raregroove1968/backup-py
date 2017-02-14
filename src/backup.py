@@ -20,8 +20,9 @@ def check_repo_server(cfg):
     try:
         basics = cfg['basic']
         details = cfg['detail']
-        remote_archive = cfg.get('detail','remote_archive_format',raw=True) % {"backup_server":basics['backup_server'],"host":basics['host']}
-        details['remote_archive'] = remote_archive
+        if details.getboolean('is_remote_archive'):
+            remote_archive = cfg.get('detail','remote_archive_format',raw=True) % {"backup_server":basics['backup_server'],"host":basics['host']}
+            details['remote_archive'] = remote_archive
         dirs = [
             details['bk_home'],
             details['bk_home'] + '/' + details['bk_repository'],
@@ -29,8 +30,9 @@ def check_repo_server(cfg):
             details['bk_home'] + '/' + details['bk_dbdir'], 
             details['bk_home'] + '/' + details['bk_mirror'], 
             details['bk_archive'],
-            remote_archive,
         ]
+        if details.getboolean('is_remote_archive'):
+            dirs.append(remote_archive)
         errors = []
         for d in dirs:
             if not os.path.isdir(d):
@@ -202,6 +204,34 @@ def make_archive(cfg,today):
         archiveargs['archive_file'] = '%s/BACKUP_%s_%s.tgz' % (details['bk_archive'],basics['host'],today)
         archiveargs['target_dir'] = details['archive_target']
         archivecmd = cfg.get(archivetype,'cmd_format',raw=True) % archiveargs
+        output_archivecmd = ""
+        if details.getboolean('is_test'):
+            print ("EXEC: ",archivecmd)
+        else:
+            output_archivecmd = subprocess.check_output(archivecmd, shell=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as c:
+        print ("Execute Failed:", c)
+        sys.exit(c.returncode)
+    else:
+        if not details.getboolean('is_quiet') and not details.getboolean('is_test'):
+            print (output_archivecmd.decode('utf-8'))
+            lap = mktime(datetime.now().timetuple())
+            print ("Lap Time:", lap - begin_date)
+        print ("done\n")
+
+    return
+
+def remote_copy_archive(cfg,today):
+    basics = cfg['basic']
+    details = cfg['detail']
+    try:
+        print ("remote copy archive %s ..." % cfg.get('detail','bk_repository'))
+        archivetype = details['archive_type']
+        archiveargs = {}
+        archiveargs['exec_dir'] = details['bk_home'] + '/' + details['bk_repository']
+        archiveargs['archive_file'] = '%s/BACKUP_%s_%s.tgz' % (details['bk_archive'],basics['host'],today)
+        archiveargs['target_dir'] = details['archive_target']
+        archivecmd = cfg.get(archivetype,'cmd_format',raw=True) % archiveargs
         cptype = details['cp_type']
         cpargs = {}
         cpargs['exec_dir'] = details['bk_home']
@@ -212,17 +242,14 @@ def make_archive(cfg,today):
         output_archivecmd = ""
         output_cpcmd = ""
         if details.getboolean('is_test'):
-            print ("EXEC: ",archivecmd)
             print ("EXEC: ",cpcmd)
         else:
-            output_archivecmd = subprocess.check_output(archivecmd, shell=True, stderr=subprocess.STDOUT)
             output_cpcmd = subprocess.check_output(cpcmd, shell=True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as c:
         print ("Execute Failed:", c)
         sys.exit(c.returncode)
     else:
         if not details.getboolean('is_quiet') and not details.getboolean('is_test'):
-            print (output_archivecmd.decode('utf-8'))
             print (output_cpcmd.decode('utf-8'))
             lap = mktime(datetime.now().timetuple())
             print ("Lap Time:", lap - begin_date)
@@ -238,7 +265,9 @@ def sweep_archive(cfg):
         sweepargs = {}
         sweepargs['verbose'] = cfg[sweeptype]['verbose'] if not details.getboolean('is_quiet') else ''
         sweepargs['sweep_mtime'] = details['sweep_mtime']
-        sweepargs['sweep_dir'] = details['bk_archive'] + " " + details['remote_archive']
+        sweepargs['sweep_dir'] = details['bk_archive']
+        if details.getboolean('is_remote_archive'):
+            sweepargs['sweep_dir'] += " " + details['remote_archive']
         sweepcmd = cfg.get(sweeptype,'cmd_format',raw=True) % sweepargs
         output_sweepcmd = ""
         if details.getboolean('is_test'):
@@ -389,6 +418,8 @@ if config.has_option('basic','target_mirrors'):
 # make an archive file from repository and copy to archive server
 #
 make_archive(config,date)
+if config.getboolean('detail','is_remote_archive'):
+    remote_copy_archive(config,date)    
 
 #
 # sweep repository and arhcive server
