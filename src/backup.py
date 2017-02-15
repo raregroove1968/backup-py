@@ -5,7 +5,7 @@
 # Copyright 2016 Yasutaka SATO <yasutaka@freesoul.org>
 #
 
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 
 import configparser
 import subprocess
@@ -31,7 +31,7 @@ def check_repo_server(cfg):
             details['bk_home'] + '/' + details['bk_mirror'], 
             details['bk_archive'],
         ]
-        if details.getboolean('is_remote_archive'):
+        if details.getboolean('is_remote_archive') and details['cp_type'] == 'cp':
             dirs.append(remote_archive)
         errors = []
         for d in dirs:
@@ -266,7 +266,7 @@ def sweep_archive(cfg):
         sweepargs['verbose'] = cfg[sweeptype]['verbose'] if not details.getboolean('is_quiet') else ''
         sweepargs['sweep_mtime'] = details['sweep_mtime']
         sweepargs['sweep_dir'] = details['bk_archive']
-        if details.getboolean('is_remote_archive'):
+        if details.getboolean('is_remote_archive') and details['cp_type'] == 'cp':
             sweepargs['sweep_dir'] += " " + details['remote_archive']
         sweepcmd = cfg.get(sweeptype,'cmd_format',raw=True) % sweepargs
         output_sweepcmd = ""
@@ -374,7 +374,7 @@ if results.is_test:
 
 if results.create_dir:
     config.set('detail','create_dir','1')
-
+    sys.exit(0)
 
 #
 # check and create directories for repository and archive server
