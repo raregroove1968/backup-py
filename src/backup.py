@@ -5,7 +5,7 @@
 # Copyright 2016 Yasutaka SATO <yasutaka@freesoul.org>
 #
 
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 
 import configparser
 import subprocess
@@ -237,6 +237,9 @@ def remote_copy_archive(cfg,today):
         cpargs['exec_dir'] = details['bk_home']
         cpargs['verbose'] = cfg[cptype]['verbose'] if not details.getboolean('is_quiet') else ''
         cpargs['archive_file'] = archiveargs['archive_file']
+        if details.getboolean('is_remote_archive'):
+            remote_archive = cfg.get('detail','remote_archive_format',raw=True) % {"backup_server":basics['backup_server'],"host":basics['host']}
+            details['remote_archive'] = remote_archive
         cpargs['target_dir'] = details['remote_archive']
         cpcmd = cfg.get(cptype,'cmd_format',raw=True) % cpargs
         output_archivecmd = ""
@@ -374,12 +377,13 @@ if results.is_test:
 
 if results.create_dir:
     config.set('detail','create_dir','1')
+    check_repo_server(config)
     sys.exit(0)
 
 #
 # check and create directories for repository and archive server
 #
-check_repo_server(config)
+#check_repo_server(config)
 
 
 #
